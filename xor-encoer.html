@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>XOR Encoder by Miruko</title>
+  <style>
+    body {
+      background-color: #1e1e1e;
+      color: #fff;
+      font-family: "Sarabun", sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 8px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+    }
+    input {
+      width: 200px;
+    }
+    button {
+      background-color: #ffcc00;
+      color: #1e1e1e;
+      cursor: pointer;
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    .copy-btn {
+      margin-left: 10px;
+      font-size: 14px;
+      padding: 6px 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>XOR Encoder โดยต้าว Miruko</h1>
+
+  <input type="number" id="realValue" placeholder="ใส่เลขจริง เช่น 600000">
+  <br>
+  <input type="number" id="xorKey" placeholder="XOR KEY เช่น 918273645">
+  <br>
+  <button onclick="encode()">เข้ารหัส & ถอดรหัส</button>
+
+  <div class="result" id="output" style="display:none;">
+    <p>⛓ เข้ารหัสแล้ว: <span id="encoded"></span>
+      <button class="copy-btn" onclick="copyToClipboard('encoded')">Copy</button>
+    </p>
+    <p>🔓 ถอดรหัสกลับ: <span id="decoded"></span>
+      <button class="copy-btn" onclick="copyToClipboard('decoded')">Copy</button>
+    </p>
+  </div>
+
+  <script>
+    function encode() {
+      const real = parseInt(document.getElementById("realValue").value);
+      const key = parseInt(document.getElementById("xorKey").value);
+      if (isNaN(real) || isNaN(key)) {
+        alert("กรอกตัวเลขให้ถูกก่อนน้า~");
+        return;
+      }
+
+      const encoded = real ^ key;
+      const decoded = encoded ^ key;
+
+      document.getElementById("encoded").innerText = encoded;
+      document.getElementById("decoded").innerText = decoded;
+      document.getElementById("output").style.display = "block";
+    }
+
+    function copyToClipboard(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("คัดลอกเรียบร้อยแล้ว!");
+      });
+    }
+  </script>
+</body>
+</html>
