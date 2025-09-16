@@ -13,9 +13,7 @@
       line-height: 1.6;
       background: #f7f7f7;
     }
-    h1 {
-      color: #1a73e8;
-    }
+    h1 { color: #1a73e8; }
     textarea {
       width: 100%;
       height: 120px;
@@ -24,7 +22,7 @@
       font-family: monospace;
       font-size: 14px;
     }
-    button {
+    button, select {
       background: #1a73e8;
       color: #fff;
       border: none;
@@ -33,9 +31,7 @@
       cursor: pointer;
       margin: 4px 2px;
     }
-    button:hover {
-      background: #0f5ac6;
-    }
+    button:hover, select:hover { background: #0f5ac6; }
     pre {
       background: #222;
       color: #0f0;
@@ -51,14 +47,21 @@
   <h2>URL → JSON</h2>
   <textarea id="input" placeholder="วาง VLESS หรือ VMess URL ที่นี่..."></textarea>
   <button onclick="convertToJson()">Convert to JSON</button>
+  <button onclick="copyOutput()">Copy JSON</button>
   <pre id="output">รอการแปลง...</pre>
 
   <h2>JSON → URL</h2>
-  <textarea id="jsonInput" placeholder='วาง JSON ที่นี่...'></textarea>
+  <textarea id="jsonInput" placeholder='วาง JSON (Node เดี่ยว หรือ Config เต็ม) ที่นี่...'></textarea>
+  <button onclick="detectJson()">Load Outbounds</button>
+  <select id="outboundSelect" style="display:none;" onchange="updateOutboundIndex()"></select>
   <button onclick="convertToUrl()">Convert to URL</button>
+  <button onclick="copyUrl()">Copy URL</button>
   <pre id="urlOutput">รอการแปลง...</pre>
 
   <script>
+    let outbounds = [];
+    let selectedIndex = 0;
+
     function convertToJson() {
       const input = document.getElementById("input").value.trim();
       let result = {};
@@ -94,33 +97,108 @@
       document.getElementById("output").textContent = JSON.stringify(result, null, 2);
     }
 
+    function detectJson() {
+      try {
+        const obj = JSON.parse(document.getElementById("jsonInput").value);
+        if (obj.outbounds && Array.isArray(obj.outbounds)) {
+          outbounds = obj.outbounds;
+          const select = document.getElementById("outboundSelect");
+          select.innerHTML = "";
+          outbounds.forEach((ob, i) => {
+            const tag = ob.tag || `${ob.protocol}-${i}`;
+            const option = document.createElement("option");
+            option.value = i;
+            option.textContent = `Outbound[${i}] - ${tag}`;
+            select.appendChild(option);
+          });
+          select.style.display = "inline-block";
+          selectedIndex = 0;
+        } else {
+          outbounds = [obj];
+          document.getElementById("outboundSelect").style.display = "none";
+        }
+      } catch (e) {
+        alert("JSON ไม่ถูกต้อง: " + e.message);
+      }
+    }
+
+    function updateOutboundIndex() {
+      const select = document.getElementById("outboundSelect");
+      selectedIndex = parseInt(select.value);
+    }
+
     function convertToUrl() {
       let result = "";
       try {
         const obj = JSON.parse(document.getElementById("jsonInput").value);
+        let node = obj;
 
-        if (obj.protocol === "vless") {
-          result =
-            `vless://${obj.id}@${obj.address}:${obj.port}` +
-            `?encryption=${obj.encryption || "none"}` +
-            `&security=${obj.security || "none"}` +
-            `&type=${obj.type || "tcp"}` +
-            (obj.host ? `&host=${obj.host}` : "") +
-            (obj.path ? `&path=${obj.path}` : "") +
-            (obj.remark ? `#${encodeURIComponent(obj.remark)}` : "");
-
-        } else if (obj.protocol === "vmess" || obj.v) {
-          const jsonStr = JSON.stringify(obj);
-          result = "vmess://" + btoa(jsonStr);
-
-        } else {
-          result = "ไม่รองรับ JSON นี้";
+        if (outbounds.length > 0) {
+          node = outbounds[selectedIndex];
         }
+
+        if (node.settings && node.settings.vnext) {
+          node.address = node.settings.vnext[0].address;
+          node.port = node.settings.vnext[0].port;
+          node.id = node.settings.vnext[0].users[0].id;
+          node.encryption = node.settings.vnext[0].users[0].encryption || "none";
+        }
+
+        if (node.streamSettings && node.streamSettings.wsSettings) {
+          node.type = node.streamSettings.network;
+          node.host = node.streamSettings.wsSettings.headers?.Host || "";
+          node.path = node.streamSettings.wsSettings.path || "";
+        }
+
+        if (node.protocol === "vless") {
+          result =
+            `vless://${node.id}@${node.address}:${node.port}` +
+            `?encryption=${node.encryption || "none"}` +
+            `&security=${node.security || "none"}` +
+            `&type=${node.type || "tcp"}` +
+            (node.host ? `&host=${node.host}` : "") +
+            (node.path ? `&path=${node.path}` : "") +
+            (node.tag ? `#${encodeURIComponent(node.tag)}` : "");
+        }
+        else if (node.protocol === "vmess") {
+          const vmessJson = {
+            v: "2",
+            ps: node.tag || "",
+            add: node.address,
+            port: String(node.port),
+            id: node.id,
+            aid: "0",
+            net: node.type || "tcp",
+            type: "none",
+            host: node.host || "",
+            path: node.path || "",
+            tls: ""
+          };
+          result = "vmess://" + btoa(JSON.stringify(vmessJson));
+        }
+        else {
+          result = "ไม่รองรับ outbound นี้";
+        }
+
       } catch (e) {
         result = "เกิดข้อผิดพลาด: " + e.message;
       }
 
       document.getElementById("urlOutput").textContent = result;
+    }
+
+    function copyOutput() {
+      const text = document.getElementById("output").textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("📋 JSON ถูกคัดลอกแล้ว");
+      });
+    }
+
+    function copyUrl() {
+      const text = document.getElementById("urlOutput").textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("📋 URL ถูกคัดลอกแล้ว");
+      });
     }
   </script>
 </body>
