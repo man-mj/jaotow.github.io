@@ -100,8 +100,18 @@
     function detectJson() {
       try {
         const obj = JSON.parse(document.getElementById("jsonInput").value);
+
+        // ถ้ามี outbounds → ใช้งาน
         if (obj.outbounds && Array.isArray(obj.outbounds)) {
-          outbounds = obj.outbounds;
+          outbounds = obj.outbounds.filter(ob =>
+            ob.protocol === "vless" || ob.protocol === "vmess"
+          );
+
+          if (outbounds.length === 0) {
+            alert("ไม่พบ outbounds ที่เป็น vless/vmess");
+            return;
+          }
+
           const select = document.getElementById("outboundSelect");
           select.innerHTML = "";
           outbounds.forEach((ob, i) => {
@@ -113,7 +123,9 @@
           });
           select.style.display = "inline-block";
           selectedIndex = 0;
+
         } else {
+          // JSON Node เดี่ยว
           outbounds = [obj];
           document.getElementById("outboundSelect").style.display = "none";
         }
@@ -130,13 +142,9 @@
     function convertToUrl() {
       let result = "";
       try {
-        const obj = JSON.parse(document.getElementById("jsonInput").value);
-        let node = obj;
+        let node = outbounds[selectedIndex] || {};
 
-        if (outbounds.length > 0) {
-          node = outbounds[selectedIndex];
-        }
-
+        // VMess/VLESS ที่อยู่ใน vnext
         if (node.settings && node.settings.vnext) {
           node.address = node.settings.vnext[0].address;
           node.port = node.settings.vnext[0].port;
